@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man Web Edition | Antigravity</title>
+    <meta name="description" content="Uma recriação fiel do clássico arcade Pac-Man, desenvolvida com o motor Antigravity.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <header>
+            <h1 id="game-title">PAC-MAN <span>WEB</span></h1>
+            <div class="header-right">
+                <button id="main-restart-btn" class="secondary-btn">REINICIAR</button>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="label">PONTOS:</span>
+                        <span id="score">0000</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">RECORD:</span>
+                        <span id="highscore">0000</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main id="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+            
+            <div id="overlay" class="hidden">
+                <div class="glass-panel">
+                    <h2 id="overlay-title">PAUSADO</h2>
+                    <p id="overlay-msg">Pressione ESC para continuar</p>
+                    <button id="restart-btn">REINICIAR</button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <div class="controls-hint">
+                <span><kbd>↑↓←→</kbd> ou <kbd>WASD</kbd> Mover</span>
+                <span><kbd>ESC</kbd> Pausar</span>
+            </div>
+            <p class="branding">Powered by <strong>Antigravity Engine</strong></p>
+        </footer>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
