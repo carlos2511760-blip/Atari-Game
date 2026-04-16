@@ -14,6 +14,90 @@ const overlayMsg = document.getElementById('overlay-msg');
 const restartBtn = document.getElementById('restart-btn');
 const mainRestartBtn = document.getElementById('main-restart-btn');
 
+/**
+ * AudioManager - Procedural Sound Generation
+ */
+class AudioManager {
+    constructor() {
+        this.basePath = 'Songs/';
+        this.sounds = {
+            chomp: new Audio(this.basePath + 'pacman_chomp.wav'),
+            death: new Audio(this.basePath + 'pacman_death.wav'),
+            eatfruit: new Audio(this.basePath + 'pacman_eatfruit.wav'),
+            eatghost: new Audio(this.basePath + 'pacman_eatghost.wav'),
+            extra: new Audio(this.basePath + 'pacman_extrapac.wav'),
+            intermission: new Audio(this.basePath + 'pacman_intermission.wav')
+        };
+        // Background siren remains procedural for seamless looping
+        this.ctx = null;
+        this.sirenOsc = null;
+        this.isSirenPlaying = false;
+        this.lastWakaTime = 0;
+    }
+
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    playWaka() {
+        const now = Date.now();
+        if (now - this.lastWakaTime < 150) return; // Cooldown to slow down playback
+        
+        this.lastWakaTime = now;
+        const s = this.sounds.chomp.cloneNode();
+        s.volume = 0.3;
+        s.play().catch(() => {});
+    }
+
+    playSiren(active) {
+        if (!this.ctx) return;
+        if (active && !this.isSirenPlaying) {
+            this.sirenOsc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            this.sirenOsc.type = 'triangle';
+            this.sirenOsc.frequency.setValueAtTime(120, this.ctx.currentTime);
+            const mod = this.ctx.createOscillator();
+            const modGain = this.ctx.createGain();
+            mod.frequency.value = 4;
+            modGain.gain.value = 15;
+            mod.connect(modGain);
+            modGain.connect(this.sirenOsc.frequency);
+            mod.start();
+            gain.gain.value = 0.03;
+            this.sirenOsc.connect(gain);
+            gain.connect(this.ctx.destination);
+            this.sirenOsc.start();
+            this.isSirenPlaying = true;
+        } else if (!active && this.isSirenPlaying) {
+            if (this.sirenOsc) {
+                this.sirenOsc.stop();
+                this.sirenOsc = null;
+            }
+            this.isSirenPlaying = false;
+        }
+    }
+
+    playDeath() {
+        this.sounds.death.play().catch(() => {});
+    }
+
+    playEatGhost() {
+        this.sounds.eatghost.play().catch(() => {});
+    }
+
+    playExtraLife() {
+        this.sounds.extra.play().catch(() => {});
+    }
+
+    playWin() {
+        this.sounds.intermission.play().catch(() => {});
+    }
+}
+
+const audio = new AudioManager();
+
 // Constants
 const TILE_SIZE = 30;
 const GRID_WIDTH = 19;
@@ -22,35 +106,36 @@ canvas.width = TILE_SIZE * GRID_WIDTH;
 canvas.height = TILE_SIZE * GRID_HEIGHT;
 
 const COLORS = {
-    wall: '#1a1aff',
-    dot: '#ffb8ae',
+    wall: '#dfab28', // Atari Gold
+    dot: '#fff',
     powerPellet: '#fff',
     pacman: '#ffff00',
     ghosts: ['#ff0000', '#ffb8ff', '#00ffff', '#ffb852'],
     frightened: '#0000ff',
-    frightenedEnding: '#ffffff'
+    frightenedEnding: '#ffffff',
+    bg: '#000088' // Atari Blue
 };
 
 const MAP_TEMPLATE = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
     [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
-    [1,3,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,3,1],
-    [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-    [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
-    [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-    [1,1,1,1,2,1,1,1,0,0,0,1,1,1,2,1,1,1,1],
-    [0,0,0,1,2,1,0,0,0,0,0,0,0,1,2,1,0,0,0],
-    [1,1,1,1,2,1,0,1,1,0,1,1,0,1,2,1,1,1,1],
-    [0,0,0,0,2,0,0,1,0,0,0,1,0,0,2,0,0,0,0],
-    [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
-    [0,0,0,1,2,1,0,0,0,0,0,0,0,1,2,1,0,0,0],
-    [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
-    [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
     [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-    [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
-    [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
-    [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-    [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+    [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+    [1,1,1,2,1,1,1,1,1,0,1,1,1,1,1,2,1,1,1],
+    [1,2,2,2,2,2,2,2,2,0,2,2,2,2,2,2,2,2,1],
+    [1,2,1,1,1,2,1,1,1,1,1,1,1,2,1,1,1,2,1],
+    [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+    [1,1,1,1,1,2,1,1,0,0,0,1,1,2,1,1,1,1,1],
+    [0,0,0,0,1,2,1,0,0,0,0,0,1,2,1,0,0,0,0],
+    [1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,1,1,1,1],
+    [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+    [1,2,1,1,1,1,1,2,1,1,1,2,1,1,1,1,1,2,1],
+    [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+    [1,1,1,1,1,2,1,1,2,1,2,1,1,2,1,1,1,1,1],
+    [1,3,2,2,2,2,2,2,2,0,2,2,2,2,2,2,2,3,1],
+    [1,2,1,1,1,2,1,1,1,1,1,1,1,2,1,1,1,2,1],
+    [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+    [1,1,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1],
     [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
@@ -240,27 +325,31 @@ class Game {
     }
 
     draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Atari Background
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         for (let y = 0; y < GRID_HEIGHT; y++) {
             for (let x = 0; x < GRID_WIDTH; x++) {
                 if (MAP_TEMPLATE[y][x] === 1) {
                     ctx.fillStyle = COLORS.wall;
-                    ctx.fillRect(x * TILE_SIZE + 2, y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                    ctx.fillRect(x * TILE_SIZE + 1, y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2);
                 }
             }
         }
+        
+        // Draw Dots (Atari style: blocky dashes)
         ctx.fillStyle = COLORS.dot;
         this.dots.forEach(dot => {
-            ctx.beginPath();
-            ctx.arc(dot.x * TILE_SIZE + TILE_SIZE / 2, dot.y * TILE_SIZE + TILE_SIZE / 2, 2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(dot.x * TILE_SIZE + TILE_SIZE / 2 - 4, dot.y * TILE_SIZE + TILE_SIZE / 2 - 2, 8, 4);
         });
+
+        // Draw Power Pellets (Atari style: large blocks)
         ctx.fillStyle = COLORS.powerPellet;
         this.powerPellets.forEach(pp => {
-            ctx.beginPath();
-            ctx.arc(pp.x * TILE_SIZE + TILE_SIZE / 2, pp.y * TILE_SIZE + TILE_SIZE / 2, 5, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(pp.x * TILE_SIZE + TILE_SIZE / 2 - 8, pp.y * TILE_SIZE + TILE_SIZE / 2 - 8, 16, 16);
         });
+
         this.pacman.draw();
         this.ghosts.forEach(g => g.draw());
     }
@@ -283,10 +372,14 @@ class Game {
         this.pacman.update();
         const pPos = this.pacman.getGridPos();
         
+        // Background siren based on movement
+        audio.playSiren(this.pacman.dir.x !== 0 || this.pacman.dir.y !== 0);
+        
         const dotIndex = this.dots.findIndex(d => d.x === pPos.x && d.y === pPos.y);
         if (dotIndex !== -1) {
             this.dots.splice(dotIndex, 1);
             this.score += 10;
+            audio.playWaka();
             this.checkExtraLife();
             this.updateUI();
         }
@@ -295,6 +388,7 @@ class Game {
         if (ppIndex !== -1) {
             this.powerPellets.splice(ppIndex, 1);
             this.score += 50;
+            audio.playWaka();
             this.activateFrightened();
             this.checkExtraLife();
             this.updateUI();
@@ -307,6 +401,7 @@ class Game {
                 if (ghost.frightened) {
                     ghost.reset();
                     this.score += 200;
+                    audio.playEatGhost();
                     this.checkExtraLife();
                     this.updateUI();
                 } else {
@@ -324,6 +419,7 @@ class Game {
         if (this.score - this.lastExtraLifeScore >= 10000) {
             this.lives++;
             this.lastExtraLifeScore += 10000;
+            audio.playExtraLife();
             this.updateUI();
         }
     }
@@ -350,6 +446,7 @@ class Game {
 
     handleDeath() {
         this.lives--;
+        audio.playDeath();
         this.updateUI();
         if (this.lives <= 0) {
             this.gameOver();
@@ -371,6 +468,7 @@ class Game {
     handleLevelWin() {
         this.state = 'PAUSED';
         this.level++;
+        audio.playWin();
         // Increase difficulty
         this.ghosts.forEach(g => {
             g.baseSpeed = Math.min(2.0, 1.0 + (this.level * 0.1));
@@ -451,6 +549,7 @@ window.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', () => {
+    audio.init();
     if (game.state === 'PAUSED') {
         game.pause();
     } else {
@@ -458,6 +557,7 @@ restartBtn.addEventListener('click', () => {
     }
 });
 mainRestartBtn.addEventListener('click', () => {
+    audio.init();
     game.state = 'GAMEOVER'; 
     game.restart();
 });
