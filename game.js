@@ -195,9 +195,15 @@ class Pacman extends Entity {
         this.mouthOpen = 0;
         this.mouthDir = 1;
         this.rotation = 0;
+        this.isDying = false;
+        this.deathProgress = 0;
     }
 
     draw() {
+        if (this.isDying) {
+            this.drawDying();
+            return;
+        }
         ctx.save();
         ctx.translate(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2);
         ctx.rotate(this.rotation);
@@ -213,7 +219,29 @@ class Pacman extends Entity {
         ctx.restore();
     }
 
+    drawDying() {
+        ctx.save();
+        ctx.translate(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2);
+        ctx.rotate(this.rotation);
+        ctx.beginPath();
+        // The angle grows from normal to full circle missing
+        const startAngle = Math.PI * this.deathProgress;
+        const endAngle = 2 * Math.PI - startAngle;
+        if (startAngle < endAngle) {
+            ctx.arc(0, 0, this.radius, startAngle, endAngle);
+            ctx.lineTo(0, 0);
+            ctx.fillStyle = COLORS.pacman;
+            ctx.fill();
+        }
+        ctx.closePath();
+        ctx.restore();
+    }
+
     update() {
+        if (this.isDying) {
+            this.deathProgress += 0.02;
+            return;
+        }
         super.update();
         if (this.dir.x !== 0 || this.dir.y !== 0) {
             this.mouthOpen += 0.1 * this.mouthDir;
@@ -355,6 +383,13 @@ class Game {
     }
 
     update() {
+        if (this.state === 'DYING') {
+            this.pacman.update();
+            if (this.pacman.deathProgress >= 1) {
+                this.finishDeath();
+            }
+            return;
+        }
         if (this.state !== 'PLAYING') return;
 
         // Frightened timer check
@@ -445,9 +480,16 @@ class Game {
     }
 
     handleDeath() {
+        this.state = 'DYING';
+        this.pacman.isDying = true;
+        this.pacman.deathProgress = 0;
+        audio.playSiren(false);
+    }
+
+    finishDeath() {
         this.lives--;
-        audio.playDeath();
         this.updateUI();
+        this.pacman.isDying = false;
         if (this.lives <= 0) {
             this.gameOver();
         } else {
@@ -456,6 +498,7 @@ class Game {
             this.pacman.y = TILE_SIZE * 15;
             this.pacman.dir = { x: 0, y: 0 };
             this.pacman.nextDir = { x: 0, y: 0 };
+            this.pacman.deathProgress = 0;
             this.ghosts.forEach(g => g.reset());
             this.state = 'PAUSED';
             overlay.classList.remove('hidden');
@@ -478,6 +521,8 @@ class Game {
         this.pacman.y = TILE_SIZE * 15;
         this.pacman.dir = { x: 0, y: 0 };
         this.pacman.nextDir = { x: 0, y: 0 };
+        this.pacman.isDying = false;
+        this.pacman.deathProgress = 0;
         
         // Blink effect
         overlay.classList.remove('hidden');
@@ -489,6 +534,7 @@ class Game {
 
     gameOver() {
         this.state = 'GAMEOVER';
+        audio.playDeath();
         overlay.classList.remove('hidden');
         overlayTitle.innerText = "GAME OVER";
         overlayMsg.innerText = "";
@@ -508,6 +554,8 @@ class Game {
         this.pacman.y = TILE_SIZE * 15;
         this.pacman.dir = { x: 0, y: 0 };
         this.pacman.nextDir = { x: 0, y: 0 };
+        this.pacman.isDying = false;
+        this.pacman.deathProgress = 0;
         this.ghosts.forEach(g => g.reset());
         this.updateUI();
         this.state = 'PLAYING';
