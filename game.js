@@ -405,7 +405,13 @@ window.addEventListener('keydown', e => {
     }
 });
 
-restartBtn.addEventListener('click', () => game.restart());
+restartBtn.addEventListener('click', () => {
+    if (game.state === 'PAUSED') {
+        game.pause();
+    } else {
+        game.restart();
+    }
+});
 mainRestartBtn.addEventListener('click', () => game.restart());
 
 function loop() {
