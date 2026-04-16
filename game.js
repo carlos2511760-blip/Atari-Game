@@ -375,6 +375,12 @@ class Game {
             this.state = 'PLAYING';
             overlay.classList.add('hidden');
         }
+    showMenu() {
+        this.state = 'MENU';
+        overlay.classList.remove('hidden');
+        overlayTitle.innerText = "PAC-MAN WEB";
+        overlayMsg.innerText = "WASD ou Setas para mover";
+        restartBtn.innerText = "INICIAR JOGO";
     }
 }
 
@@ -421,5 +427,5 @@ function loop() {
 }
 
 // Start game
-game.state = 'PLAYING';
+game.showMenu();
 loop();
